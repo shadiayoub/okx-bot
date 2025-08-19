@@ -304,6 +304,7 @@ class OKXFuturesBot:
     
     async def _execute_trade(self, symbol: str, signal: str, price: float, strength: float):
         """Execute trade based on signal"""
+        logger.info(f"🔧 _execute_trade called for {symbol} with signal={signal}, price={price}, strength={strength}")
         try:
             # Check if we already have a position
             if symbol in self.positions:
@@ -313,21 +314,48 @@ class OKXFuturesBot:
             # Calculate position size
             balance = await self._get_balance()
             position_size = balance * self.risk_per_trade * self.leverage
+            logger.info(f"🔧 Balance: ${balance:.2f}, Position Size: ${position_size:.2f}")
             
             # Determine order side
             side = 'buy' if signal == 'BUY' else 'sell'
+            logger.info(f"🔧 Order side: {side}")
             
             # Calculate quantity
             quantity = position_size / price
+            logger.info(f"🔧 Raw Quantity: {quantity:.6f}")
+            
+            # Round quantity to meet OKX lot size requirements
+            # For SOL-USDT-SWAP, lot size is typically 0.1
+            lot_size = 0.1  # Default lot size for most crypto futures
+            if 'BTC' in symbol:
+                lot_size = 0.01
+            elif 'ETH' in symbol:
+                lot_size = 0.1
+            elif 'SOL' in symbol:
+                lot_size = 0.1
+            elif 'BNB' in symbol:
+                lot_size = 0.01
+            elif 'ADA' in symbol:
+                lot_size = 1.0
+            
+            # Round down to nearest lot size
+            quantity = (quantity // lot_size) * lot_size
+            if quantity < lot_size:
+                quantity = lot_size  # Minimum order size
+            
+            logger.info(f"🔧 Rounded Quantity: {quantity:.6f} (lot size: {lot_size})")
             
             # Place order
+            logger.info(f"🔧 About to place order with OKX API: {symbol}, {side}, {quantity}")
             order = self.trade_api.set_order(
                 instId=symbol,
                 tdMode='cross',
                 side=side,
+                posSide='long' if side == 'buy' else 'short',  # Required for futures
                 ordType='market',
                 sz=str(quantity)
             )
+            logger.info(f"🔧 OKX API response: {order}")
             
             if order.get('code') == '0':
                 # Store position info
@@ -370,6 +398,7 @@ class OKXFuturesBot:
                 instId=symbol,
                 tdMode='cross',
                 side=stop_side,
+                posSide='long' if side == 'buy' else 'short',  # Required for futures
                 ordType='conditional',
                 sz=str(quantity),
                 slTriggerPx=str(stop_price),
@@ -382,6 +411,7 @@ class OKXFuturesBot:
                 instId=symbol,
                 tdMode='cross',
                 side=stop_side,
+                posSide='long' if side == 'buy' else 'short',  # Required for futures
                 ordType='conditional',
                 sz=str(quantity),
                 tpTriggerPx=str(take_profit_price),
