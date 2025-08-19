@@ -270,11 +270,6 @@ class EnhancedStrategy:
         
         # Additional filters
         if signal:
-            # Check if signal meets minimum confidence
-            if strength < 0.4:
-                signal = None
-                strength = 0.0
-            
             # Check if ML prediction is too weak
             if abs(ml_prediction) < self.min_prediction_threshold:
                 signal = None
