@@ -257,6 +257,11 @@ class EnhancedStrategy:
         
         # Get ML prediction
         logger.info("About to call get_ml_prediction")
+        logger.info(f"Predictor is None: {self.predictor is None}")
+        if self.predictor is not None:
+            logger.info(f"Predictor type: {type(self.predictor)}")
+            logger.info(f"Predictor is_trained: {self.predictor.is_trained}")
+        
         ml_prediction, ml_confidence = self.get_ml_prediction(df)
         logger.info(f"ML prediction result: {ml_prediction}, confidence: {ml_confidence}")
         

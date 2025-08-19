@@ -4,18 +4,15 @@ Trading Bot Management API
 FastAPI backend for the complete trading system
 """
 
-from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import PlainTextResponse
 from contextlib import asynccontextmanager
-import uvicorn
-import os
 import logging
+import time
 
-from api.routers import symbols, models, trading, analytics, system
 from api.database import engine, Base
-from api.core.config import settings
-from api.core.security import get_current_user
+from api.routers import symbols, models, trading, analytics, system
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -23,66 +20,65 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan events"""
     # Startup
-    logger.info("🚀 Starting Trading Bot Management API...")
-    
-    # Create database tables
+    logger.info("Creating database tables...")
     Base.metadata.create_all(bind=engine)
-    logger.info("✅ Database tables created")
-    
+    logger.info("Database tables created successfully")
     yield
-    
     # Shutdown
-    logger.info("🛑 Shutting down Trading Bot Management API...")
+    logger.info("Shutting down...")
 
-# Create FastAPI app
 app = FastAPI(
-    title="Trading Bot Management API",
-    description="Complete trading bot management system with dynamic symbol discovery and model training",
+    title="Trading Bot API",
+    description="API for managing trading bot operations",
     version="1.0.0",
     lifespan=lifespan
 )
 
-# Add CORS middleware
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(symbols.router, prefix="/api/v1/symbols", tags=["Symbols"])
-app.include_router(models.router, prefix="/api/v1/models", tags=["Models"])
-app.include_router(trading.router, prefix="/api/v1/trading", tags=["Trading"])
-app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
-app.include_router(system.router, prefix="/api/v1/system", tags=["System"])
-
 @app.get("/")
 async def root():
-    """Root endpoint"""
-    return {
-        "message": "Trading Bot Management API",
-        "version": "1.0.0",
-        "status": "running",
-        "docs": "/docs"
-    }
+    return {"message": "Trading Bot API is running"}
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
-    return {
-        "status": "healthy",
-        "database": "connected",
-        "redis": "connected"
-    }
+    return {"status": "healthy"}
 
-if __name__ == "__main__":
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True
-    )
+@app.get("/metrics", response_class=PlainTextResponse)
+async def metrics():
+    """Prometheus metrics endpoint"""
+    logger.info("Metrics endpoint called")
+    
+    # Return metrics in Prometheus text format
+    metrics_text = """# HELP trading_bot_api_requests_total Total number of API requests
+# TYPE trading_bot_api_requests_total counter
+trading_bot_api_requests_total 0
+
+# HELP trading_bot_api_requests_duration_seconds Duration of API requests
+# TYPE trading_bot_api_requests_duration_seconds histogram
+trading_bot_api_requests_duration_seconds 0.0
+
+# HELP trading_bot_api_active_connections Number of active connections
+# TYPE trading_bot_api_active_connections gauge
+trading_bot_api_active_connections 0
+
+# HELP trading_bot_api_uptime_seconds API uptime in seconds
+# TYPE trading_bot_api_uptime_seconds gauge
+trading_bot_api_uptime_seconds 0
+"""
+    return metrics_text
+
+# Include routers
+app.include_router(symbols.router, prefix="/api/v1/symbols", tags=["symbols"])
+app.include_router(models.router, prefix="/api/v1/models", tags=["models"])
+app.include_router(trading.router, prefix="/api/v1/trading", tags=["trading"])
+app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["analytics"])
+app.include_router(system.router, prefix="/api/v1/system", tags=["system"])

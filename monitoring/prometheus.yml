@@ -12,12 +12,12 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:9090']
 
-  # Trading API
-  - job_name: 'trading-api'
-    static_configs:
-      - targets: ['trading-api:8000']
-    metrics_path: '/metrics'
-    scrape_interval: 10s
+  # Trading API (metrics endpoint not implemented)
+  # - job_name: 'trading-api'
+  #   static_configs:
+  #     - targets: ['trading-api:8000']
+  #   metrics_path: '/metrics'
+  #   scrape_interval: 10s
 
   # Trading Engine
   - job_name: 'trading-engine'

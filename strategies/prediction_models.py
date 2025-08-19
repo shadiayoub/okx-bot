@@ -126,7 +126,11 @@ class PricePredictor:
         df['mfi'] = 100 - (100 / (1 + mfi_ratio))
         
         # Time-based features
-        if 'open_time' in df.columns:
+        if 'timestamp' in df.columns:
+            # OKX format with timestamp column
+            df['hour'] = pd.to_datetime(df['timestamp'], unit='ms').dt.hour
+            df['day_of_week'] = pd.to_datetime(df['timestamp'], unit='ms').dt.dayofweek
+        elif 'open_time' in df.columns:
             # Binance format with open_time column
             df['hour'] = pd.to_datetime(df['open_time'], unit='ms').dt.hour
             df['day_of_week'] = pd.to_datetime(df['open_time'], unit='ms').dt.dayofweek

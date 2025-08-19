@@ -16,8 +16,11 @@ celery_app = Celery('trading_bot')
 # the configuration object to child processes.
 celery_app.config_from_object('worker.celeryconfig')
 
-# Load task modules from all registered Django app configs.
-celery_app.autodiscover_tasks()
+# Import tasks explicitly
+celery_app.autodiscover_tasks(['worker.tasks'])
+
+# Import tasks directly to ensure they're registered
+import worker.tasks
 
 @celery_app.task(bind=True)
 def debug_task(self):

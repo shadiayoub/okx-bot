@@ -240,9 +240,18 @@ class OKXFuturesBot:
                 return None, 0.0
             
             logger.info(f"Calling generate_signal for {symbol}")
+            logger.info(f"Strategy type: {type(self.strategies[symbol])}")
+            logger.info(f"Strategy has generate_signal: {hasattr(self.strategies[symbol], 'generate_signal')}")
+            
             # Generate signal using your strategy
-            signal, strength, signal_data = self.strategies[symbol].generate_signal(df)
-            logger.info(f"generate_signal returned: signal={signal}, strength={strength}")
+            try:
+                signal, strength, signal_data = self.strategies[symbol].generate_signal(df)
+                logger.info(f"generate_signal returned: signal={signal}, strength={strength}")
+            except Exception as e:
+                logger.error(f"Error calling generate_signal: {e}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                return None, 0.0
             
             # Get current real-time price from ticker
             ticker_info = self.market_api.get_ticker(instId=symbol)
@@ -400,13 +409,18 @@ class OKXFuturesBot:
                     continue
                 
                 for symbol in self.symbols:
+                    logger.info(f"Processing symbol: {symbol}")
                     # Get market data
                     df = await self._get_market_data(symbol)
                     if df.empty:
+                        logger.warning(f"Empty market data for {symbol}")
                         continue
                     
+                    logger.info(f"Got market data for {symbol}, shape: {df.shape}")
                     # Generate signal
+                    logger.info(f"About to call _generate_signal for {symbol}")
                     signal, strength = await self._generate_signal(symbol, df)
+                    logger.info(f"_generate_signal returned: signal={signal}, strength={strength}")
                     
                     # Execute trade if signal is strong enough and auto-trading is enabled
                     if signal and strength > self.min_signal_strength:
