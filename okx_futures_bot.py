@@ -9,6 +9,8 @@ import logging
 import os
 import sys
 import time
+import json
+import redis
 from datetime import datetime
 from typing import Dict, Optional
 
@@ -65,6 +67,11 @@ class OKXFuturesBot:
         self.predictors = {}
         self.positions = {}
         self.running = False
+        
+        # Initialize Redis connection
+        self.redis_client = redis.Redis.from_url(
+            os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+        )
         
         logger.info(f"🤖 OKX Futures Bot initialized")
         logger.info(f"⚡ Leverage: {self.leverage}x")
@@ -166,6 +173,30 @@ class OKXFuturesBot:
         except Exception as e:
             logger.error(f"Failed to get balance: {e}")
             return 0.0
+
+    def _get_auto_trading_status(self) -> bool:
+        """Get auto trading status from Redis"""
+        try:
+            settings = self.redis_client.get("trading:settings")
+            if settings:
+                settings_data = json.loads(settings)
+                return settings_data.get("auto_trading", True)  # Default to True
+            return True  # Default to True if no settings found
+        except Exception as e:
+            logger.error(f"Failed to get auto trading status: {e}")
+            return True  # Default to True on error
+
+    def _get_trading_status(self) -> str:
+        """Get trading status from Redis"""
+        try:
+            status = self.redis_client.get("trading:status")
+            if status:
+                status_data = json.loads(status)
+                return status_data.get("status", "stopped")
+            return "stopped"
+        except Exception as e:
+            logger.error(f"Failed to get trading status: {e}")
+            return "stopped"
     
     async def _get_market_data(self, symbol: str) -> pd.DataFrame:
         """Get market data for analysis"""
@@ -214,7 +245,40 @@ class OKXFuturesBot:
                 # Fallback to candlestick close price
                 current_price = float(df['close'].iloc[-1])
             
+            # Log detailed analysis
             logger.info(f"[{symbol}] Price: ${current_price:.2f}, Signal: {signal}, Strength: {strength:.2f}")
+            
+            # Log detailed analysis if signal_data is available
+            if signal_data and 'technical_signals' in signal_data:
+                tech_signals = signal_data['technical_signals']
+                ml_pred = signal_data.get('ml_prediction', 0)
+                ml_conf = signal_data.get('ml_confidence', 0)
+                
+                logger.info(f"[{symbol}] Technical Analysis:")
+                logger.info(f"  EMA Signal: {tech_signals.get('ema_signal', 0):.2f}")
+                logger.info(f"  RSI Signal: {tech_signals.get('rsi_signal', 0):.2f}")
+                logger.info(f"  BB Signal: {tech_signals.get('bb_signal', 0):.2f}")
+                logger.info(f"  MACD Signal: {tech_signals.get('macd_signal', 0):.2f}")
+                logger.info(f"  Volume Signal: {tech_signals.get('volume_signal', 0):.2f}")
+                logger.info(f"  Momentum Signal: {tech_signals.get('momentum_signal', 0):.2f}")
+                logger.info(f"[{symbol}] ML Analysis:")
+                logger.info(f"  ML Prediction: {ml_pred:.4f}")
+                logger.info(f"  ML Confidence: {ml_conf:.2f}")
+                
+                # Calculate what the combined score would be
+                if hasattr(self.strategies[symbol], 'combine_signals'):
+                    tech_score = sum([
+                        tech_signals.get('ema_signal', 0) * 0.3,
+                        tech_signals.get('rsi_signal', 0) * 0.2,
+                        tech_signals.get('bb_signal', 0) * 0.15,
+                        tech_signals.get('macd_signal', 0) * 0.15,
+                        tech_signals.get('volume_signal', 0) * 0.1,
+                        tech_signals.get('momentum_signal', 0) * 0.1
+                    ])
+                    ml_weight = min(ml_conf, 0.8)
+                    tech_weight = 1.0 - ml_weight
+                    combined_score = (tech_score * tech_weight + np.sign(ml_pred) * ml_weight)
+                    logger.info(f"[{symbol}] Combined Score: {combined_score:.3f} (Threshold: 0.3)")
             
             return signal, strength
             
@@ -319,6 +383,15 @@ class OKXFuturesBot:
         
         while self.running:
             try:
+                # Check trading status from Redis
+                trading_status = self._get_trading_status()
+                auto_trading_enabled = self._get_auto_trading_status()
+                
+                if trading_status != "running":
+                    logger.info(f"Trading status: {trading_status}, waiting...")
+                    await asyncio.sleep(10)  # Check every 10 seconds
+                    continue
+                
                 for symbol in self.symbols:
                     # Get market data
                     df = await self._get_market_data(symbol)
@@ -328,10 +401,15 @@ class OKXFuturesBot:
                     # Generate signal
                     signal, strength = await self._generate_signal(symbol, df)
                     
-                    # Execute trade if signal is strong enough
+                    # Execute trade if signal is strong enough and auto-trading is enabled
                     if signal and strength > self.min_signal_strength:
                         current_price = float(df['close'].iloc[-1])
-                        await self._execute_trade(symbol, signal, current_price, strength)
+                        
+                        if auto_trading_enabled:
+                            logger.info(f"🤖 Auto-trading enabled - Executing {signal} trade for {symbol}")
+                            await self._execute_trade(symbol, signal, current_price, strength)
+                        else:
+                            logger.info(f"📊 Signal detected but auto-trading disabled - {signal} for {symbol} (Strength: {strength:.2f})")
                 
                 # Wait before next iteration
                 await asyncio.sleep(60)  # Check every minute
