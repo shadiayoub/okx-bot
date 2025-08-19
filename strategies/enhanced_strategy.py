@@ -25,7 +25,7 @@ class EnhancedStrategy:
         
         # Strategy parameters
         self.min_confidence = 0.6
-        self.min_prediction_threshold = 0.001  # 0.1% minimum prediction
+        self.min_prediction_threshold = 0.0001  # 0.01% minimum prediction (lowered from 0.001)
         self.signal_decay = 0.95  # Signal strength decay factor
         
     def initialize_predictor(self, model_type: str = "random_forest"):
