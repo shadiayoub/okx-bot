@@ -32,7 +32,7 @@ def test_model(symbol, model_type="gradient_boosting"):
         # Create test data
         print("Creating test data...")
         np.random.seed(42)
-        dates = pd.date_range(start='2024-12-01', end='2024-12-31', freq='1H')
+        dates = pd.date_range(start='2024-12-01', end='2024-12-31', freq='1h')
         n_samples = len(dates)
         
         # Generate realistic price data

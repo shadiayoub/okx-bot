@@ -128,12 +128,16 @@ class PricePredictor:
         # Time-based features
         if 'timestamp' in df.columns:
             # OKX format with timestamp column
-            df['hour'] = pd.to_datetime(df['timestamp'], unit='ms').dt.hour
-            df['day_of_week'] = pd.to_datetime(df['timestamp'], unit='ms').dt.dayofweek
+            # Convert timestamp to numeric to avoid deprecation warning
+            timestamp_numeric = pd.to_numeric(df['timestamp'], errors='coerce')
+            df['hour'] = pd.to_datetime(timestamp_numeric, unit='ms').dt.hour
+            df['day_of_week'] = pd.to_datetime(timestamp_numeric, unit='ms').dt.dayofweek
         elif 'open_time' in df.columns:
             # Binance format with open_time column
-            df['hour'] = pd.to_datetime(df['open_time'], unit='ms').dt.hour
-            df['day_of_week'] = pd.to_datetime(df['open_time'], unit='ms').dt.dayofweek
+            # Convert open_time to numeric to avoid deprecation warning
+            open_time_numeric = pd.to_numeric(df['open_time'], errors='coerce')
+            df['hour'] = pd.to_datetime(open_time_numeric, unit='ms').dt.hour
+            df['day_of_week'] = pd.to_datetime(open_time_numeric, unit='ms').dt.dayofweek
         elif df.index.name == 'timestamp' or isinstance(df.index, pd.DatetimeIndex):
             # OKX format with timestamp index
             df['hour'] = df.index.hour
