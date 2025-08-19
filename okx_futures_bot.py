@@ -151,7 +151,11 @@ class OKXFuturesBot:
                 if os.path.exists(model_path):
                     self.predictors[okx_symbol] = PricePredictor()
                     self.predictors[okx_symbol].load_model(model_path)
+                    # Connect predictor to strategy
+                    self.strategies[okx_symbol].predictor = self.predictors[okx_symbol]
                     logger.info(f"✅ ML model loaded for {okx_symbol}")
+                    logger.info(f"🔗 Predictor connected: {self.strategies[okx_symbol].predictor is not None}")
+                    logger.info(f"🔗 Predictor type: {type(self.strategies[okx_symbol].predictor)}")
                 else:
                     logger.warning(f"⚠️ No ML model found for {okx_symbol}")
                     
@@ -232,10 +236,13 @@ class OKXFuturesBot:
         """Generate trading signal using ML model"""
         try:
             if symbol not in self.strategies:
+                logger.warning(f"No strategy found for {symbol}")
                 return None, 0.0
             
+            logger.info(f"Calling generate_signal for {symbol}")
             # Generate signal using your strategy
             signal, strength, signal_data = self.strategies[symbol].generate_signal(df)
+            logger.info(f"generate_signal returned: signal={signal}, strength={strength}")
             
             # Get current real-time price from ticker
             ticker_info = self.market_api.get_ticker(instId=symbol)

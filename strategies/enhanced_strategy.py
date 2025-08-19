@@ -162,14 +162,28 @@ class EnhancedStrategy:
     
     def get_ml_prediction(self, df: pd.DataFrame) -> Tuple[float, float]:
         """Get ML prediction for price direction"""
-        if self.predictor is None or not self.predictor.is_trained:
+        logger.info(f"get_ml_prediction called with {len(df)} data points")
+        
+        if self.predictor is None:
+            logger.warning("Predictor is None")
+            return 0.0, 0.0
+        
+        logger.info(f"Predictor type: {type(self.predictor)}")
+        logger.info(f"Predictor is_trained: {self.predictor.is_trained}")
+        
+        if not self.predictor.is_trained:
+            logger.warning("Predictor is not trained")
             return 0.0, 0.0
         
         try:
+            logger.info(f"About to call predictor.predict with {len(df)} data points")
             prediction, confidence = self.predictor.predict(df)
+            logger.info(f"ML prediction result: {prediction}, confidence: {confidence}")
             return prediction, confidence
         except Exception as e:
             logger.error(f"ML prediction failed: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return 0.0, 0.0
     
     def combine_signals(self, technical_signals: Dict[str, float], 
@@ -235,11 +249,16 @@ class EnhancedStrategy:
     def generate_signal(self, df: pd.DataFrame) -> Tuple[Optional[str], float, Dict[str, Any]]:
         """Generate trading signal using enhanced strategy"""
         
+        logger.info("generate_signal called")
+        
         # Calculate technical signals
         technical_signals = self.calculate_technical_signals(df)
+        logger.info(f"Technical signals calculated: {technical_signals}")
         
         # Get ML prediction
+        logger.info("About to call get_ml_prediction")
         ml_prediction, ml_confidence = self.get_ml_prediction(df)
+        logger.info(f"ML prediction result: {ml_prediction}, confidence: {ml_confidence}")
         
         # Combine signals
         signal, strength = self.combine_signals(technical_signals, ml_prediction, ml_confidence)

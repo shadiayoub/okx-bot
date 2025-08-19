@@ -126,8 +126,20 @@ class PricePredictor:
         df['mfi'] = 100 - (100 / (1 + mfi_ratio))
         
         # Time-based features
-        df['hour'] = pd.to_datetime(df['open_time'], unit='ms').dt.hour
-        df['day_of_week'] = pd.to_datetime(df['open_time'], unit='ms').dt.dayofweek
+        if 'open_time' in df.columns:
+            # Binance format with open_time column
+            df['hour'] = pd.to_datetime(df['open_time'], unit='ms').dt.hour
+            df['day_of_week'] = pd.to_datetime(df['open_time'], unit='ms').dt.dayofweek
+        elif df.index.name == 'timestamp' or isinstance(df.index, pd.DatetimeIndex):
+            # OKX format with timestamp index
+            df['hour'] = df.index.hour
+            df['day_of_week'] = df.index.dayofweek
+        else:
+            # Fallback - use current time
+            current_time = pd.Timestamp.now()
+            df['hour'] = current_time.hour
+            df['day_of_week'] = current_time.dayofweek
+            
         df['is_weekend'] = df['day_of_week'].isin([5, 6]).astype(int)
         df['is_london_open'] = ((df['hour'] >= 8) & (df['hour'] < 16)).astype(int)
         df['is_ny_open'] = ((df['hour'] >= 13) & (df['hour'] < 21)).astype(int)
@@ -262,12 +274,21 @@ class PricePredictor:
     def predict(self, df: pd.DataFrame) -> Tuple[float, float]:
         """Make prediction for the next period"""
         if not self.is_trained:
+            logger.error("Model is not trained")
             raise ValueError("Model must be trained before making predictions")
+        
+        logger.info(f"Making prediction with {len(df)} data points")
+        logger.info(f"Input data columns: {list(df.columns)}")
+        logger.info(f"Input data shape: {df.shape}")
+        logger.info(f"Input data index type: {type(df.index)}")
         
         # Create features for the latest data
         df_features = self.create_features(df)
         
+        logger.info(f"Created features with {len(df_features)} rows and {len(df_features.columns)} columns")
+        
         if len(df_features) == 0:
+            logger.error("No features created")
             return 0.0, 0.0
         
         # Check if we have the required feature columns
@@ -314,6 +335,7 @@ class PricePredictor:
         # Make prediction
         try:
             prediction = self.model.predict(latest_scaled)[0]
+            logger.info(f"Raw prediction value: {prediction}")
         except Exception as e:
             logger.error(f"Prediction failed: {e}")
             return 0.0, 0.0
