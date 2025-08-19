@@ -137,7 +137,7 @@ class TradingService:
                 # Default settings
                 default_settings = {
                     "leverage": 10,
-                    "risk_per_trade": 0.05,
+                    "risk_per_trade": 0.10,  # 10% for true 10x leverage
                     "min_signal_strength": 0.3,
                     "stop_loss_pct": 0.02,
                     "take_profit_pct": 0.04,

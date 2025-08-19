@@ -47,9 +47,9 @@ class OKXFuturesBot:
         self.api_secret = os.getenv('OKX_API_SECRET')
         self.passphrase = os.getenv('OKX_PASSPHRASE')
         
-        # Trading parameters
+        # Trading parameters (will be updated from Redis settings)
         self.leverage = int(os.getenv('LEVERAGE', '10'))
-        self.risk_per_trade = float(os.getenv('RISK_PER_TRADE', '0.05'))
+        self.risk_per_trade = float(os.getenv('RISK_PER_TRADE', '0.10'))  # Default to 10% for true 10x leverage
         self.min_signal_strength = float(os.getenv('MIN_SIGNAL_STRENGTH', '0.3'))
         self.stop_loss_pct = float(os.getenv('STOP_LOSS_PCT', '0.02'))
         self.take_profit_pct = float(os.getenv('TAKE_PROFIT_PCT', '0.04'))
@@ -76,6 +76,38 @@ class OKXFuturesBot:
         logger.info(f"🤖 OKX Futures Bot initialized")
         logger.info(f"⚡ Leverage: {self.leverage}x")
         logger.info(f"🎯 Risk per trade: {self.risk_per_trade*100}%")
+        
+        # Load settings from Redis
+        self._load_settings_from_redis()
+    
+    def _load_settings_from_redis(self):
+        """Load trading settings from Redis"""
+        try:
+            settings = self.redis_client.get('trading:settings')
+            if settings:
+                settings_dict = json.loads(settings)
+                # Update bot settings from Redis
+                if 'leverage' in settings_dict:
+                    self.leverage = int(settings_dict['leverage'])
+                if 'risk_per_trade' in settings_dict:
+                    self.risk_per_trade = float(settings_dict['risk_per_trade'])
+                if 'min_signal_strength' in settings_dict:
+                    self.min_signal_strength = float(settings_dict['min_signal_strength'])
+                if 'stop_loss_pct' in settings_dict:
+                    self.stop_loss_pct = float(settings_dict['stop_loss_pct'])
+                if 'take_profit_pct' in settings_dict:
+                    self.take_profit_pct = float(settings_dict['take_profit_pct'])
+                
+                logger.info(f"🔄 Settings loaded from Redis:")
+                logger.info(f"   ⚡ Leverage: {self.leverage}x")
+                logger.info(f"   🎯 Risk per trade: {self.risk_per_trade*100}%")
+                logger.info(f"   📊 Min signal strength: {self.min_signal_strength}")
+                logger.info(f"   🛑 Stop loss: {self.stop_loss_pct*100}%")
+                logger.info(f"   🎯 Take profit: {self.take_profit_pct*100}%")
+            else:
+                logger.info("📝 No Redis settings found, using defaults")
+        except Exception as e:
+            logger.error(f"❌ Failed to load settings from Redis: {e}")
     
     async def initialize(self):
         """Initialize the bot"""
@@ -426,6 +458,7 @@ class OKXFuturesBot:
         """Main trading loop"""
         logger.info("🚀 Starting OKX Futures ML Trading Bot...")
         self.running = True
+        settings_reload_counter = 0  # Counter to reload settings periodically
         
         while self.running:
             try:
@@ -461,6 +494,13 @@ class OKXFuturesBot:
                             await self._execute_trade(symbol, signal, current_price, strength)
                         else:
                             logger.info(f"📊 Signal detected but auto-trading disabled - {signal} for {symbol} (Strength: {strength:.2f})")
+                
+                # Reload settings from Redis every 10 iterations (every 10 minutes)
+                settings_reload_counter += 1
+                if settings_reload_counter >= 10:
+                    logger.info("🔄 Reloading settings from Redis...")
+                    self._load_settings_from_redis()
+                    settings_reload_counter = 0
                 
                 # Wait before next iteration
                 await asyncio.sleep(60)  # Check every minute

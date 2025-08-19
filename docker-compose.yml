@@ -10,12 +10,12 @@ services:
       # Exchange configuration
       - EXCHANGE_CHOICE=okx
       
-      # Trading parameters
-      - LEVERAGE=10
-      - RISK_PER_TRADE=0.05
-      - MIN_SIGNAL_STRENGTH=0.3
-      - STOP_LOSS_PCT=0.02
-      - TAKE_PROFIT_PCT=0.04
+      # Trading parameters (these can be overridden by dashboard settings)
+      - LEVERAGE=${LEVERAGE:-10}
+      - RISK_PER_TRADE=${RISK_PER_TRADE:-0.10}
+      - MIN_SIGNAL_STRENGTH=${MIN_SIGNAL_STRENGTH:-0.3}
+      - STOP_LOSS_PCT=${STOP_LOSS_PCT:-0.015}
+      - TAKE_PROFIT_PCT=${TAKE_PROFIT_PCT:-0.02}
       
       # OKX API credentials (set these in .env file)
       - OKX_API_KEY=${OKX_API_KEY}
