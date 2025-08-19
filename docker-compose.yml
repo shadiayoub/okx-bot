@@ -1,0 +1,51 @@
+services:
+  okx-trading-bot:
+    build: .
+    container_name: okx-trading-bot
+    restart: unless-stopped
+    environment:
+      # Exchange configuration
+      - EXCHANGE_CHOICE=okx
+      
+      # Trading parameters
+      - LEVERAGE=10
+      - RISK_PER_TRADE=0.05
+      - MIN_SIGNAL_STRENGTH=0.3
+      - STOP_LOSS_PCT=0.02
+      - TAKE_PROFIT_PCT=0.04
+      
+      # OKX API credentials (set these in .env file)
+      - OKX_API_KEY=${OKX_API_KEY}
+      - OKX_API_SECRET=${OKX_API_SECRET}
+      - OKX_PASSPHRASE=${OKX_PASSPHRASE}
+      
+      # Optional settings
+      - MIN_BALANCE_THRESHOLD=50.0
+      - DAILY_MAX_LOSS_PCT=0.05
+      - TRADING_INTERVAL=60
+      - LOG_LEVEL=INFO
+      
+    volumes:
+      # Mount logs directory for persistence
+      - ./logs:/app/logs
+      
+      # Mount models directory (if you want to update models without rebuilding)
+      - ./models:/app/models
+      
+    env_file:
+      - .env
+      
+    networks:
+      - trading-network
+      
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  trading-network:
+    driver: bridge
